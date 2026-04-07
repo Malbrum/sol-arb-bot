@@ -27,7 +27,13 @@ const usdcMint = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-function instructionFormat(instruction) {
+interface InstructionData {
+    programId: string;
+    accounts: { pubkey: string; isSigner: boolean; isWritable: boolean }[];
+    data: string;
+}
+
+function instructionFormat(instruction: InstructionData) {
     return {
         programId: new PublicKey(instruction.programId),
         keys: instruction.accounts.map(account => ({
@@ -42,6 +48,8 @@ function instructionFormat(instruction) {
 async function run() {
 
     const start = Date.now();
+
+    try {
 
     // quote0: WSOL -> USDC
     const quote0Params = {
@@ -66,11 +74,11 @@ async function run() {
     const quote1Resp = await axios.get(quoteUrl, { params: quote1Params })
 
     // profit but not real
-    const diffLamports = (quote1Resp.data.outAmount - quote0Params.amount);
+    const diffLamports = (Number(quote1Resp.data.outAmount) - quote0Params.amount);
     console.log('diffLamports:', diffLamports)
     const jitoTip = Math.floor(diffLamports * 0.5)
 
-    // threhold
+    // threshold
     const thre = 3000
     if (diffLamports > thre) {
 
@@ -95,7 +103,7 @@ async function run() {
         const instructionsResp = await axios.post(swapInstructionUrl, swapData);
         const instructions = instructionsResp.data;
 
-        // bulid tx
+        // build tx
         let ixs: TransactionInstruction[] = [];
 
         // 1. cu
@@ -114,7 +122,7 @@ async function run() {
         const swapInstructions = instructionFormat(instructions.swapInstruction);
         ixs.push(swapInstructions);
 
-        // 5. cal real profit and pay for jito from your program
+        // 5. calculate real profit and pay for jito from your program
         // a simple transfer instruction here
         // the real profit and tip should be calculated in your program
         const tipInstruction = SystemProgram.transfer({
@@ -165,18 +173,21 @@ async function run() {
         const bundle_id = bundle_resp.data.result
         console.log(`sent to frankfurt, bundle id: ${bundle_id}`)
 
-        // cal time cost
+        // calculate time cost
         const end = Date.now();
         const duration = end - start;
 
         console.log(`${wSolMint} - ${usdcMint}`)
         console.log(`slot: ${mergedQuoteResp.contextSlot}, total duration: ${duration}ms`)
     }
+    } catch (err) {
+        console.error('Error in run():', err instanceof Error ? err.message : err);
+    }
 }
 
 async function main() {
 
-    while(1) {
+    while (true) {
 
         await run();
 
